@@ -4,7 +4,7 @@ const routes = [
   {
     path: '/',
     name: 'dashboard',
-    component: () => import('../pages/index.vue'),
+    redirect: '/forecast',
   },
   {
     path: '/flocks',

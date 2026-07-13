@@ -2,10 +2,12 @@
   <v-app>
     <v-app-bar app color="primary" dark elevation="2">
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title class="text-h5 font-weight-bold">
-        <v-icon class="mr-2">mdi-egg</v-icon>
-        Chicken Herd Manager
-      </v-toolbar-title>
+      <router-link to="/" style="text-decoration: none; color: inherit; display: flex; align-items: center;">
+        <v-toolbar-title class="text-h5 font-weight-bold" style="cursor: pointer;">
+          <v-icon class="mr-2">mdi-egg</v-icon>
+          Chicken Herd Manager
+        </v-toolbar-title>
+      </router-link>
       <v-spacer></v-spacer>
     </v-app-bar>
 
