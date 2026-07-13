@@ -48,6 +48,9 @@ function initializeDb() {
       temperament TEXT DEFAULT '',
       size TEXT DEFAULT '',
       egg_color TEXT DEFAULT '',
+      cold_hardy BOOLEAN DEFAULT 1,
+      heat_hardy BOOLEAN DEFAULT 1,
+      broodiness INTEGER DEFAULT 2,
       is_active BOOLEAN DEFAULT 1,
       -- Custom production curve parameters (breed-specific function)
       production_curve_type TEXT DEFAULT 'standard',

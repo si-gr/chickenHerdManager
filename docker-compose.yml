@@ -1,21 +1,25 @@
 services:
-  chicken-herd-manager:
+  # =============================================================================
+  # BACKEND - Node.js API (internal service, not exposed externally)
+  # =============================================================================
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: chicken-herd-manager
+      target: backend
+    container_name: chicken-herd-backend
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     volumes:
-      # Persist SQLite database outside container
-      - ./data:/app/server/data
+      # Persist SQLite database using Docker-managed volume (better permissions)
+      - chicken-data:/app/server/data
     environment:
       - NODE_ENV=production
       - PORT=3001
       - DB_PATH=/app/server/data/chicken_herd.db
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/chickens"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -23,6 +27,50 @@ services:
     networks:
       - chicken-net
 
+  # =============================================================================
+  # FRONTEND - Vue 3 + Nginx (exposed on port 80/443 via reverse proxy)
+  # =============================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    container_name: chicken-herd-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - VIRTUAL_HOST=soarpreme.eu,www.soarpreme.eu
+      - LETSENCRYPT_HOST=soarpreme.eu
+      - LETSENCRYPT_EMAIL=webmaster@soarpreme.eu
+    labels:
+      # Nginx Proxy Manager auto-discovery labels
+      - "com.github.nginx-proxy-manager.host=soarpreme.eu,www.soarpreme.eu"
+      - "com.github.nginx-proxy-manager.port=80"
+      - "com.github.nginx-proxy-manager.ssl=true"
+      - "com.github.nginx-proxy-manager.letsencrypt.agree=true"
+      - "com.github.nginx-proxy-manager.letsencrypt.email=webmaster@soarpreme.eu"
+      # Also support nginx-proxy-compat (jwilder/nginx-proxy)
+      - "com.github.jrcs.letsencrypt_nginx_proxy_companion.CERT_NAME=soarpreme.eu"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - chicken-net
+      - proxy
+
+volumes:
+  chicken-data:
+    driver: local
+    name: chicken-herd-data
+
 networks:
   chicken-net:
     driver: bridge
+    name: chicken-herd-network
+  proxy:
+    external: true
