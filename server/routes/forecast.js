@@ -52,6 +52,25 @@ router.get('/', (req, res) => {
     
     const flocks = db.prepare(flocksQuery).all(...flockParams)
 
+    // Get breed-specific production curves
+    const breeds = db.prepare('SELECT * FROM breeds WHERE is_active = 1').all()
+    const breedCurves = {}
+    breeds.forEach(b => {
+      breedCurves[b.name] = {
+        production_curve_type: b.production_curve_type || 'standard',
+        custom_ramp_start_age: b.custom_ramp_start_age || 20,
+        custom_ramp_end_age: b.custom_ramp_end_age || 32,
+        custom_peak_rate: b.custom_peak_rate || b.peak_production_rate,
+        custom_decline_start_age: b.custom_decline_start_age || 60,
+        custom_decline_rate: b.custom_decline_rate || b.decline_rate,
+        custom_molt_start_age: b.custom_molt_start_age || paramMap.molting_start_age,
+        custom_molt_duration: b.custom_molt_duration || paramMap.molting_duration,
+        custom_molt_rate: b.custom_molt_rate || 2.0,
+        custom_post_molt_rate: b.custom_post_molt_rate || 3.5,
+        custom_post_molt_decline: b.custom_post_molt_decline || 0.08,
+      }
+    })
+
     // Calculate current age for each flock
     const today = new Date()
     const flocksWithAge = flocks.map(flock => ({
