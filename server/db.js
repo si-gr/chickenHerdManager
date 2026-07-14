@@ -349,5 +349,4 @@ function seedDefaultAdmin() {
   console.log('Default admin user created (username: sigr)')
 }
 
-export { getDb, bcrypt }
 export default getDb
