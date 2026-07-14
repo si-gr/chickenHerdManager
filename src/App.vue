@@ -9,6 +9,17 @@
         </v-toolbar-title>
       </router-link>
       <v-spacer></v-spacer>
+      
+      <!-- User menu with logout -->
+      <div v-if="isLoggedIn" class="d-flex align-center mr-2">
+        <v-chip color="white" text-color="primary" size="small" class="mr-2">
+          <v-icon start size="small">mdi-account</v-icon>
+          {{ currentUser?.username || 'User' }}
+        </v-chip>
+        <v-btn icon size="small" variant="text" @click="handleLogout" title="Logout">
+          <v-icon>mdi-logout</v-icon>
+        </v-btn>
+      </div>
     </v-app-bar>
 
     <v-navigation-drawer v-model="drawer" app temporary>
@@ -31,9 +42,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const drawer = ref(false)
+const isLoggedIn = ref(false)
+const currentUser = ref<any>(null)
+
+// Check auth state on mount
+onMounted(() => {
+  const token = localStorage.getItem('adminToken')
+  const userStr = localStorage.getItem('adminUser')
+  
+  if (token && userStr) {
+    try {
+      currentUser.value = JSON.parse(userStr)
+      isLoggedIn.value = true
+    } catch (e) {
+      // Invalid stored data
+      localStorage.removeItem('adminToken')
+      localStorage.removeItem('adminUser')
+    }
+  }
+})
+
+// Logout handler
+function handleLogout() {
+  localStorage.removeItem('adminToken')
+  localStorage.removeItem('adminUser')
+  isLoggedIn.value = false
+  currentUser.value = null
+  
+  // Redirect to admin login page
+  router.push('/admin')
+}
 
 const navItems = [
   { title: 'Dashboard', icon: 'mdi-view-dashboard', to: '/' },

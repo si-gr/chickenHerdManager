@@ -1,19 +1,19 @@
 <template>
   <v-container fluid class="pa-6">
-    <v-card elevation="2" max-width="1200" class="mx-auto">
-      <v-card-title class="text-h4 font-weight-bold pa-4">
-        <v-icon class="mr-2">mdi-shield-account</v-icon>
-        Admin Panel
-      </v-card-title>
+    <!-- Login Screen -->
+    <div v-if="!isLoggedIn">
+      <v-card elevation="4" max-width="450" class="mx-auto mt-10">
+        <v-card-title class="text-h4 font-weight-bold pa-4 text-center">
+          <v-icon class="mr-2" size="large">mdi-shield-account</v-icon>
+          Login
+        </v-card-title>
 
-      <v-card-text class="pa-4">
-        <!-- Login Form -->
-        <div v-if="!isLoggedIn" class="mt-4">
+        <v-card-text class="pa-4">
           <v-alert type="info" variant="tonal" class="mb-4">
-            Please log in with admin credentials to access user management.
+            Enter your credentials to access the Chicken Herd Manager.
           </v-alert>
           
-          <v-form @submit.prevent="handleLogin" class="max-width-400 mx-auto">
+          <v-form @submit.prevent="handleLogin">
             <v-text-field
               v-model="loginForm.username"
               label="Username"
@@ -44,10 +44,19 @@
               Login
             </v-btn>
           </v-form>
-        </div>
+        </v-card-text>
+      </v-card>
+    </div>
 
-        <!-- User Management (after login) -->
-        <div v-else>
+    <!-- User Management (after login) -->
+    <div v-else>
+      <v-card elevation="2" max-width="1200" class="mx-auto">
+        <v-card-title class="text-h4 font-weight-bold pa-4">
+          <v-icon class="mr-2">mdi-shield-account</v-icon>
+          Admin Panel
+        </v-card-title>
+
+        <v-card-text class="pa-4">
           <div class="d-flex justify-space-between align-center mb-4">
             <div>
               <span class="text-body-1 mr-2">Logged in as:</span>

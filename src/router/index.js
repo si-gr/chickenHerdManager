@@ -43,4 +43,21 @@ const router = createRouter({
   routes,
 })
 
+// Global navigation guard - redirect to admin login if not authenticated
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('adminToken')
+  
+  // Admin page is always accessible (it shows login form when not logged in)
+  if (to.name === 'admin') {
+    return next()
+  }
+  
+  // All other pages require authentication
+  if (!token) {
+    return next({ name: 'admin' })
+  }
+  
+  next()
+})
+
 export default router
