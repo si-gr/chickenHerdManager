@@ -125,12 +125,11 @@
               </tr>
             </tbody>
           </v-table>
-        </div>
-      </v-card-text>
-    </v-card>
+        </v-card-text>
+      </v-card>
 
-    <!-- Add/Edit User Dialog -->
-    <v-dialog v-model="userDialog" max-width="500">
+      <!-- Add/Edit User Dialog -->
+      <v-dialog v-model="userDialog" max-width="500">
       <v-card>
         <v-card-title>
           {{ editMode ? 'Edit User' : 'Add New User' }}
@@ -191,7 +190,7 @@
       <v-card>
         <v-card-title class="text-h5">Confirm Delete</v-card-title>
         <v-card-text>
-          Are you sure you want to delete user <strong>{{ userToDelete?.username }}</strong>?
+          Are you sure you want to delete user <strong>{{ userToDelete?.username }}</strong>?<br>
           This action cannot be undone.
         </v-card-text>
         <v-card-actions>
@@ -201,6 +200,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    </div>
   </v-container>
 </template>
 
