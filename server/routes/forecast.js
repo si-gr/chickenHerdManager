@@ -1,14 +1,33 @@
 import { Router } from 'express'
 import { getDb } from '../db.js'
+import { optionalAuthMiddleware } from './auth.js'
 
 const router = Router()
+
+// Apply optional auth to all routes
+router.use(optionalAuthMiddleware)
 
 // Generate forecast with 80-week horizon and flock-based model
 router.get('/', (req, res) => {
   try {
     const db = getDb()
+    
+    if (!req.user) {
+      return res.json({
+        history: [],
+        forecast: [],
+        total_predicted: 0,
+        peak_week: 0,
+        peak_eggs: 0,
+        replacement_weeks: [],
+        flocks_included: [],
+        assumptions: {}
+      })
+    }
+    
     const { weeks = 80, coop_id, flock_id } = req.query
     const numWeeks = Math.min(parseInt(weeks) || 80, 160) // Cap at 160 weeks
+    const userId = req.user.userId
 
     // Get forecasting parameters
     const params = db.prepare('SELECT param_name, param_value FROM forecasting_params').all()
@@ -21,9 +40,9 @@ router.get('/', (req, res) => {
     let historyQuery = `
       SELECT date, SUM(egg_count) as total_eggs
       FROM egg_production
-      WHERE date >= ?
+      WHERE date >= ? AND user_id = ?
     `
-    const params_arr = [ninetyDaysAgo]
+    const params_arr = [ninetyDaysAgo, userId]
 
     if (coop_id) {
       historyQuery += ' AND coop_id = ?'
@@ -38,8 +57,8 @@ router.get('/', (req, res) => {
     const history = db.prepare(historyQuery).all(...params_arr)
 
     // Get all active flocks for forecasting
-    let flocksQuery = 'SELECT * FROM flocks WHERE status = ?'
-    const flockParams = ['active']
+    let flocksQuery = 'SELECT * FROM flocks WHERE status = ? AND user_id = ?'
+    const flockParams = ['active', userId]
     
     if (coop_id) {
       flocksQuery += ' AND coop_id = ?'
@@ -53,7 +72,7 @@ router.get('/', (req, res) => {
     const flocks = db.prepare(flocksQuery).all(...flockParams)
 
     // Get breed-specific production curves
-    const breeds = db.prepare('SELECT * FROM breeds WHERE is_active = 1').all()
+    const breeds = db.prepare('SELECT * FROM breeds WHERE is_active = 1 AND (user_id = ? OR user_id IS NULL)').all(userId)
     const breedCurves = {}
     breeds.forEach(b => {
       breedCurves[b.name] = {

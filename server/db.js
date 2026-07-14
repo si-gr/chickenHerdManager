@@ -31,16 +31,19 @@ function initializeDb() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS coops (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL DEFAULT 1,
       name TEXT NOT NULL UNIQUE,
       capacity INTEGER NOT NULL DEFAULT 50,
       notes TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     -- Breed management with production characteristics
     CREATE TABLE IF NOT EXISTS breeds (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL DEFAULT 1,
       name TEXT NOT NULL UNIQUE,
       description TEXT DEFAULT '',
       peak_production_rate REAL DEFAULT 5.5,
@@ -66,12 +69,14 @@ function initializeDb() {
       custom_post_molt_rate REAL DEFAULT 3.5,
       custom_post_molt_decline REAL DEFAULT 0.08,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     -- Flock/batch management for large-scale herds
     CREATE TABLE IF NOT EXISTS flocks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL DEFAULT 1,
       name TEXT NOT NULL,
       breed TEXT NOT NULL,
       count INTEGER NOT NULL DEFAULT 0,
@@ -82,12 +87,14 @@ function initializeDb() {
       notes TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (coop_id) REFERENCES coops(id) ON DELETE SET NULL
+      FOREIGN KEY (coop_id) REFERENCES coops(id) ON DELETE SET NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     -- Keep individual chickens table for backward compatibility
     CREATE TABLE IF NOT EXISTS chickens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL DEFAULT 1,
       name TEXT NOT NULL,
       breed TEXT NOT NULL,
       date_of_birth TEXT NOT NULL,
@@ -98,11 +105,13 @@ function initializeDb() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (coop_id) REFERENCES coops(id) ON DELETE SET NULL,
-      FOREIGN KEY (flock_id) REFERENCES flocks(id) ON DELETE SET NULL
+      FOREIGN KEY (flock_id) REFERENCES flocks(id) ON DELETE SET NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS egg_production (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL DEFAULT 1,
       chicken_id INTEGER,
       flock_id INTEGER,
       coop_id INTEGER,
@@ -112,7 +121,8 @@ function initializeDb() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (chicken_id) REFERENCES chickens(id) ON DELETE CASCADE,
       FOREIGN KEY (flock_id) REFERENCES flocks(id) ON DELETE CASCADE,
-      FOREIGN KEY (coop_id) REFERENCES coops(id) ON DELETE CASCADE
+      FOREIGN KEY (coop_id) REFERENCES coops(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     -- Forecasting parameters/settings
@@ -133,6 +143,13 @@ function initializeDb() {
     CREATE INDEX IF NOT EXISTS idx_egg_production_chicken ON egg_production(chicken_id);
     CREATE INDEX IF NOT EXISTS idx_egg_production_flock ON egg_production(flock_id);
     CREATE INDEX IF NOT EXISTS idx_egg_production_coop ON egg_production(coop_id);
+    
+    -- User ownership indexes
+    CREATE INDEX IF NOT EXISTS idx_coops_user ON coops(user_id);
+    CREATE INDEX IF NOT EXISTS idx_breeds_user ON breeds(user_id);
+    CREATE INDEX IF NOT EXISTS idx_flocks_user ON flocks(user_id);
+    CREATE INDEX IF NOT EXISTS idx_chickens_user ON chickens(user_id);
+    CREATE INDEX IF NOT EXISTS idx_egg_production_user ON egg_production(user_id);
 
     -- User management for admin access
     CREATE TABLE IF NOT EXISTS users (
@@ -175,6 +192,9 @@ function initializeDb() {
   if (userCount.count === 0) {
     seedDefaultAdmin()
   }
+  
+  // Migrate existing data to admin user if columns don't exist
+  migrateDataToUsers(db)
 }
 
 function seedBreeds() {
@@ -347,6 +367,34 @@ function seedDefaultAdmin() {
   const passwordHash = bcrypt.hashSync('rentacar', 10)
   insertUser.run('sigr', passwordHash, 'admin', 1)
   console.log('Default admin user created (username: sigr)')
+}
+
+function migrateDataToUsers(db) {
+  // Check if user_id columns exist and add them if not
+  try {
+    // For each table, check if user_id column exists
+    const tables = ['coops', 'breeds', 'flocks', 'chickens', 'egg_production']
+    
+    for (const table of tables) {
+      const columns = db.pragma(`table_info(${table})`)
+      const hasUserId = columns.some(col => col.name === 'user_id')
+      
+      if (!hasUserId) {
+        // Add user_id column with default value 1 (admin user)
+        db.exec(`ALTER TABLE ${table} ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1`)
+        console.log(`Added user_id column to ${table}`)
+      }
+    }
+    
+    // Update all existing records to belong to admin user (id=1)
+    for (const table of tables) {
+      db.exec(`UPDATE ${table} SET user_id = 1 WHERE user_id IS NULL`)
+    }
+    
+    console.log('Data migration to users completed')
+  } catch (error) {
+    console.error('Migration error:', error.message)
+  }
 }
 
 export default getDb

@@ -1,13 +1,21 @@
 import { Router } from 'express'
 import { getDb } from '../db.js'
+import { optionalAuthMiddleware } from './auth.js'
 
 const router = Router()
+
+// Apply optional auth to all routes
+router.use(optionalAuthMiddleware)
 
 // Get egg production records
 router.get('/', (req, res) => {
   try {
     const db = getDb()
     const { start_date, end_date, coop_id, chicken_id, flock_id } = req.query
+
+    if (!req.user) {
+      return res.json([])
+    }
 
     let query = `
       SELECT ep.*,
@@ -20,33 +28,29 @@ router.get('/', (req, res) => {
       LEFT JOIN chickens c ON ep.chicken_id = c.id
       LEFT JOIN flocks f ON ep.flock_id = f.id
       LEFT JOIN coops co ON ep.coop_id = co.id
+      WHERE ep.user_id = ?
     `
-    const params = []
-    const conditions = []
+    const params = [req.user.userId]
 
     if (start_date) {
-      conditions.push('ep.date >= ?')
+      query += ' AND ep.date >= ?'
       params.push(start_date)
     }
     if (end_date) {
-      conditions.push('ep.date <= ?')
+      query += ' AND ep.date <= ?'
       params.push(end_date)
     }
     if (coop_id) {
-      conditions.push('ep.coop_id = ?')
+      query += ' AND ep.coop_id = ?'
       params.push(coop_id)
     }
     if (chicken_id) {
-      conditions.push('ep.chicken_id = ?')
+      query += ' AND ep.chicken_id = ?'
       params.push(chicken_id)
     }
     if (flock_id) {
-      conditions.push('ep.flock_id = ?')
+      query += ' AND ep.flock_id = ?'
       params.push(flock_id)
-    }
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ')
     }
 
     query += ' ORDER BY ep.date DESC, ep.id DESC'
@@ -104,17 +108,21 @@ router.post('/', (req, res) => {
     if (!date || egg_count === undefined) {
       return res.status(400).json({ error: 'Date and egg_count are required' })
     }
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
 
     // Auto-set coop_id from flock if not provided
     let finalCoopId = coop_id
     if (!finalCoopId && flock_id) {
-      const flock = db.prepare('SELECT coop_id FROM flocks WHERE id = ?').get(flock_id)
+      const flock = db.prepare('SELECT coop_id FROM flocks WHERE id = ? AND user_id = ?').get(flock_id, req.user.userId)
       if (flock) finalCoopId = flock.coop_id
     }
 
     const result = db.prepare(
-      'INSERT INTO egg_production (chicken_id, flock_id, coop_id, date, egg_count, notes) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(chicken_id || null, flock_id || null, finalCoopId || null, date, egg_count, notes || '')
+      'INSERT INTO egg_production (user_id, chicken_id, flock_id, coop_id, date, egg_count, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(req.user.userId, chicken_id || null, flock_id || null, finalCoopId || null, date, egg_count, notes || '')
 
     const record = db.prepare('SELECT * FROM egg_production WHERE id = ?').get(result.lastInsertRowid)
     res.status(201).json(record)
@@ -130,8 +138,12 @@ router.put('/:id', (req, res) => {
     const db = getDb()
     const { chicken_id, coop_id, date, egg_count, notes } = req.body
     const id = req.params.id
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
 
-    const existing = db.prepare('SELECT * FROM egg_production WHERE id = ?').get(id)
+    const existing = db.prepare('SELECT * FROM egg_production WHERE id = ? AND user_id = ?').get(id, req.user.userId)
     if (!existing) {
       return res.status(404).json({ error: 'Record not found' })
     }
@@ -143,14 +155,15 @@ router.put('/:id', (req, res) => {
           date = COALESCE(?, date),
           egg_count = COALESCE(?, egg_count),
           notes = COALESCE(?, notes)
-      WHERE id = ?
+      WHERE id = ? AND user_id = ?
     `).run(
       chicken_id ?? existing.chicken_id,
       coop_id ?? existing.coop_id,
       date,
       egg_count,
       notes,
-      id
+      id,
+      req.user.userId
     )
 
     const record = db.prepare('SELECT * FROM egg_production WHERE id = ?').get(id)
@@ -165,7 +178,12 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const db = getDb()
-    const result = db.prepare('DELETE FROM egg_production WHERE id = ?').run(req.params.id)
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+    
+    const result = db.prepare('DELETE FROM egg_production WHERE id = ? AND user_id = ?').run(req.params.id, req.user.userId)
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Record not found' })
     }

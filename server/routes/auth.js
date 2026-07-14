@@ -81,4 +81,20 @@ export function adminMiddleware(req, res, next) {
   next()
 }
 
+// Optional auth middleware - doesn't fail if no token, but sets req.user if valid
+export function optionalAuthMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1]
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET)
+      req.user = decoded
+    } catch (error) {
+      // Token invalid, continue without user
+    }
+  }
+  next()
+}
+
 export default router

@@ -1,18 +1,32 @@
 import { Router } from 'express'
 import { getDb } from '../db.js'
+import { optionalAuthMiddleware } from './auth.js'
 
 const router = Router()
 
-// Get all coops
+// Apply optional auth to all routes
+router.use(optionalAuthMiddleware)
+
+// Get all coops (filtered by user if authenticated, otherwise show public/shared)
 router.get('/', (req, res) => {
   try {
     const db = getDb()
-    const coops = db.prepare(`
-      SELECT c.*,
-        (SELECT COUNT(*) FROM chickens ch WHERE ch.coop_id = c.id AND ch.status = 'active') as chicken_count
-      FROM coops c
-      ORDER BY c.name ASC
-    `).all()
+    
+    let query
+    if (req.user) {
+      // Authenticated user - show only their coops
+      query = `
+        SELECT c.*,
+          (SELECT COUNT(*) FROM chickens ch WHERE ch.coop_id = c.id AND ch.status = 'active') as chicken_count
+        FROM coops c
+        WHERE c.user_id = ?
+        ORDER BY c.name ASC
+      `
+      var coops = db.prepare(query).all(req.user.userId)
+    } else {
+      // No auth - return empty or could show public coops
+      coops = []
+    }
     res.json(coops)
   } catch (error) {
     console.error('Error fetching coops:', error)
@@ -24,7 +38,12 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const db = getDb()
-    const coop = db.prepare('SELECT * FROM coops WHERE id = ?').get(req.params.id)
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+    
+    const coop = db.prepare('SELECT * FROM coops WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId)
     if (!coop) {
       return res.status(404).json({ error: 'Coop not found' })
     }
@@ -44,10 +63,15 @@ router.post('/', (req, res) => {
     if (!name) {
       return res.status(400).json({ error: 'Name is required' })
     }
+    
+    // Require authentication
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
 
     const result = db.prepare(
-      'INSERT INTO coops (name, capacity, notes) VALUES (?, ?, ?)'
-    ).run(name, capacity || 50, notes || '')
+      'INSERT INTO coops (user_id, name, capacity, notes) VALUES (?, ?, ?, ?)'
+    ).run(req.user.userId, name, capacity || 50, notes || '')
 
     const coop = db.prepare('SELECT * FROM coops WHERE id = ?').get(result.lastInsertRowid)
     res.status(201).json(coop)
@@ -66,8 +90,13 @@ router.put('/:id', (req, res) => {
     const db = getDb()
     const { name, capacity, notes } = req.body
     const id = req.params.id
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
 
-    const existing = db.prepare('SELECT * FROM coops WHERE id = ?').get(id)
+    // Check ownership
+    const existing = db.prepare('SELECT * FROM coops WHERE id = ? AND user_id = ?').get(id, req.user.userId)
     if (!existing) {
       return res.status(404).json({ error: 'Coop not found' })
     }
@@ -78,10 +107,10 @@ router.put('/:id', (req, res) => {
           capacity = COALESCE(?, capacity),
           notes = COALESCE(?, notes),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(name, capacity, notes, id)
+      WHERE id = ? AND user_id = ?
+    `).run(name, capacity, notes, id, req.user.userId)
 
-    const coop = db.prepare('SELECT * FROM coops WHERE id = ?').get(id)
+    const coop = db.prepare('SELECT * FROM coops WHERE id = ? AND user_id = ?').get(id, req.user.userId)
     res.json(coop)
   } catch (error) {
     console.error('Error updating coop:', error)
@@ -93,7 +122,12 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const db = getDb()
-    const result = db.prepare('DELETE FROM coops WHERE id = ?').run(req.params.id)
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+    
+    const result = db.prepare('DELETE FROM coops WHERE id = ? AND user_id = ?').run(req.params.id, req.user.userId)
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Coop not found' })
     }

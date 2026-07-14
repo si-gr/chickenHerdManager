@@ -8,9 +8,15 @@ const apiClient = axios.create({
   },
 })
 
-// Request interceptor
+// Request interceptor - add auth token if available
 apiClient.interceptors.request.use(
-  (config) => config,
+  (config) => {
+    const token = localStorage.getItem('adminToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
   (error) => Promise.reject(error)
 )
 

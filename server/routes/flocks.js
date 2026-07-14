@@ -1,7 +1,11 @@
 import { Router } from 'express'
 import { getDb } from '../db.js'
+import { optionalAuthMiddleware } from './auth.js'
 
 const router = Router()
+
+// Apply optional auth to all routes
+router.use(optionalAuthMiddleware)
 
 // Get all flocks
 router.get('/', (req, res) => {
@@ -9,25 +13,25 @@ router.get('/', (req, res) => {
     const db = getDb()
     const { coop_id, status } = req.query
 
+    if (!req.user) {
+      return res.json([])
+    }
+
     let query = `
       SELECT f.*, c.name as coop_name
       FROM flocks f
       LEFT JOIN coops c ON f.coop_id = c.id
+      WHERE f.user_id = ?
     `
-    const params = []
-    const conditions = []
+    const params = [req.user.userId]
 
     if (coop_id) {
-      conditions.push('f.coop_id = ?')
+      query += ' AND f.coop_id = ?'
       params.push(coop_id)
     }
     if (status) {
-      conditions.push('f.status = ?')
+      query += ' AND f.status = ?'
       params.push(status)
-    }
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ')
     }
 
     query += ' ORDER BY f.created_at DESC'
@@ -51,12 +55,17 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const db = getDb()
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+    
     const flock = db.prepare(`
       SELECT f.*, c.name as coop_name
       FROM flocks f
       LEFT JOIN coops c ON f.coop_id = c.id
-      WHERE f.id = ?
-    `).get(req.params.id)
+      WHERE f.id = ? AND f.user_id = ?
+    `).get(req.params.id, req.user.userId)
     
     if (!flock) {
       return res.status(404).json({ error: 'Flock not found' })
@@ -81,17 +90,21 @@ router.post('/', (req, res) => {
     if (!name || !breed || !birth_date) {
       return res.status(400).json({ error: 'Name, breed, and birth_date are required' })
     }
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
 
     const result = db.prepare(
-      'INSERT INTO flocks (name, breed, count, birth_date, coop_id, target_count, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(name, breed, count || 0, birth_date, coop_id || null, target_count || 0, notes || '')
+      'INSERT INTO flocks (user_id, name, breed, count, birth_date, coop_id, target_count, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(req.user.userId, name, breed, count || 0, birth_date, coop_id || null, target_count || 0, notes || '')
 
     const flock = db.prepare(`
       SELECT f.*, c.name as coop_name
       FROM flocks f
       LEFT JOIN coops c ON f.coop_id = c.id
-      WHERE f.id = ?
-    `).get(result.lastInsertRowid)
+      WHERE f.id = ? AND f.user_id = ?
+    `).get(result.lastInsertRowid, req.user.userId)
     
     res.status(201).json(flock)
   } catch (error) {
@@ -106,8 +119,12 @@ router.put('/:id', (req, res) => {
     const db = getDb()
     const { name, breed, count, status, coop_id, target_count, notes } = req.body
     const id = req.params.id
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
 
-    const existing = db.prepare('SELECT * FROM flocks WHERE id = ?').get(id)
+    const existing = db.prepare('SELECT * FROM flocks WHERE id = ? AND user_id = ?').get(id, req.user.userId)
     if (!existing) {
       return res.status(404).json({ error: 'Flock not found' })
     }
@@ -122,15 +139,15 @@ router.put('/:id', (req, res) => {
           target_count = COALESCE(?, target_count),
           notes = COALESCE(?, notes),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(name, breed, count, status, coop_id ?? existing.coop_id, target_count, notes, id)
+      WHERE id = ? AND user_id = ?
+    `).run(name, breed, count, status, coop_id ?? existing.coop_id, target_count, notes, id, req.user.userId)
 
     const flock = db.prepare(`
       SELECT f.*, c.name as coop_name
       FROM flocks f
       LEFT JOIN coops c ON f.coop_id = c.id
-      WHERE f.id = ?
-    `).get(id)
+      WHERE f.id = ? AND f.user_id = ?
+    `).get(id, req.user.userId)
     
     res.json(flock)
   } catch (error) {
@@ -143,7 +160,12 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const db = getDb()
-    const result = db.prepare('DELETE FROM flocks WHERE id = ?').run(req.params.id)
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+    
+    const result = db.prepare('DELETE FROM flocks WHERE id = ? AND user_id = ?').run(req.params.id, req.user.userId)
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Flock not found' })
     }
