@@ -80,10 +80,10 @@ router.post('/', (req, res) => {
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    // Check for duplicate
-    const existing = db.prepare('SELECT id FROM breeds WHERE name = ? AND user_id = ?').get(name, req.user.userId)
+    // Check for duplicate including system breeds
+    const existing = db.prepare('SELECT id FROM breeds WHERE name = ? AND (user_id = ? OR user_id IS NULL)').get(name, req.user.userId)
     if (existing) {
-      return res.status(409).json({ error: 'Breed already exists' })
+      return res.status(409).json({ error: 'Breed already exists (system or your own)' })
     }
 
     const result = db.prepare(`
