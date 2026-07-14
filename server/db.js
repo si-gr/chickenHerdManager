@@ -2,6 +2,7 @@ import Database from 'better-sqlite3'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { mkdirSync } from 'fs'
+import bcrypt from 'bcryptjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -132,6 +133,17 @@ function initializeDb() {
     CREATE INDEX IF NOT EXISTS idx_egg_production_chicken ON egg_production(chicken_id);
     CREATE INDEX IF NOT EXISTS idx_egg_production_flock ON egg_production(flock_id);
     CREATE INDEX IF NOT EXISTS idx_egg_production_coop ON egg_production(coop_id);
+
+    -- User management for admin access
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin', 'user')),
+      is_active BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `)
 
   // Seed forecasting parameters if empty
@@ -156,6 +168,12 @@ function initializeDb() {
   const coopCount = db.prepare('SELECT COUNT(*) as count FROM coops').get()
   if (coopCount.count === 0) {
     seedData()
+  }
+
+  // Seed default admin user if no users exist
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get()
+  if (userCount.count === 0) {
+    seedDefaultAdmin()
   }
 }
 
@@ -319,4 +337,17 @@ function seedData() {
   console.log('Database seeded with flock-based sample data')
 }
 
+function seedDefaultAdmin() {
+  const insertUser = db.prepare(`
+    INSERT INTO users (username, password_hash, role, is_active)
+    VALUES (?, ?, ?, ?)
+  `)
+  
+  // Default admin: sigr / rentacar
+  const passwordHash = bcrypt.hashSync('rentacar', 10)
+  insertUser.run('sigr', passwordHash, 'admin', 1)
+  console.log('Default admin user created (username: sigr)')
+}
+
+export { getDb, bcrypt }
 export default getDb

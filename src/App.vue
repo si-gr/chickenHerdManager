@@ -42,6 +42,7 @@ const navItems = [
   { title: 'Egg Production', icon: 'mdi-egg-outline', to: '/egg-production' },
   { title: 'Forecast', icon: 'mdi-chart-timeline-variant', to: '/forecast' },
   { title: 'Settings', icon: 'mdi-cog', to: '/settings' },
+  { title: 'Admin', icon: 'mdi-shield-account', to: '/admin' },
 ]
 </script>
 

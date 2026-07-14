@@ -11,6 +11,8 @@ import settingsRouter from './routes/settings.js'
 import eggProductionRouter from './routes/eggProduction.js'
 import dashboardRouter from './routes/dashboard.js'
 import forecastRouter from './routes/forecast.js'
+import authRouter from './routes/auth.js'
+import adminRouter from './routes/admin.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -30,6 +32,8 @@ app.use('/api/settings', settingsRouter)
 app.use('/api/egg-production', eggProductionRouter)
 app.use('/api/dashboard', dashboardRouter)
 app.use('/api/forecast', forecastRouter)
+app.use('/api/auth', authRouter)
+app.use('/api/admin', adminRouter)
 
 // Health check
 app.get('/api/health', (req, res) => {
