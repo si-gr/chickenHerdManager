@@ -292,6 +292,9 @@ async function handleLogin() {
       isLoggedIn.value = true
       loginForm.value = { username: '', password: '' }
       
+      // Dispatch custom event for same-page updates
+      window.dispatchEvent(new Event('auth-changed'))
+      
       await loadUsers()
     }
   } catch (error: any) {
@@ -310,6 +313,9 @@ function handleLogout() {
   
   localStorage.removeItem('adminToken')
   localStorage.removeItem('adminUser')
+  
+  // Dispatch custom event for same-page updates
+  window.dispatchEvent(new Event('auth-changed'))
 }
 
 // Load users

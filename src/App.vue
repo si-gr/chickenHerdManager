@@ -42,16 +42,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
+const route = useRoute()
 const drawer = ref(false)
 const isLoggedIn = ref(false)
 const currentUser = ref<any>(null)
 
 // Check auth state on mount
 onMounted(() => {
+  checkAuthState()
+  
+  // Listen for storage events (login/logout in other tabs/components)
+  window.addEventListener('storage', handleStorageChange)
+  
+  // Listen for custom auth change events (same-page login/logout)
+  window.addEventListener('auth-changed', checkAuthState)
+})
+
+// Re-check auth state on route navigation (catches login -> navigate flow)
+watch(() => route.fullPath, () => {
+  checkAuthState()
+})
+
+// Check current auth state from localStorage
+function checkAuthState() {
   const token = localStorage.getItem('adminToken')
   const userStr = localStorage.getItem('adminUser')
   
@@ -63,9 +80,21 @@ onMounted(() => {
       // Invalid stored data
       localStorage.removeItem('adminToken')
       localStorage.removeItem('adminUser')
+      isLoggedIn.value = false
+      currentUser.value = null
     }
+  } else {
+    isLoggedIn.value = false
+    currentUser.value = null
   }
-})
+}
+
+// Handle storage changes (login/logout events)
+function handleStorageChange(event: StorageEvent) {
+  if (event.key === 'adminToken' || event.key === 'adminUser') {
+    checkAuthState()
+  }
+}
 
 // Logout handler
 function handleLogout() {
@@ -73,6 +102,9 @@ function handleLogout() {
   localStorage.removeItem('adminUser')
   isLoggedIn.value = false
   currentUser.value = null
+  
+  // Trigger storage event for same-page updates
+  window.dispatchEvent(new Event('storage'))
   
   // Redirect to admin login page
   router.push('/admin')
