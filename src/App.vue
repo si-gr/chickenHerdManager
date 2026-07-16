@@ -111,11 +111,12 @@ function handleLogout() {
 }
 
 const navItems = [
-  { title: 'Dashboard', icon: 'mdi-view-dashboard', to: '/' },
+  { title: 'Barns', icon: 'mdi-barn', to: '/coops' },
+  { title: 'Regional Forecast', icon: 'mdi-map-marker-radius', to: '/regional-forecast' },
+  { title: 'Forecast', icon: 'mdi-chart-timeline-variant', to: '/forecast' },
   { title: 'Flocks', icon: 'mdi-account-group', to: '/flocks' },
   { title: 'Breeds', icon: 'mdi-chicken-variant', to: '/breeds' },
   { title: 'Egg Production', icon: 'mdi-egg-outline', to: '/egg-production' },
-  { title: 'Forecast', icon: 'mdi-chart-timeline-variant', to: '/forecast' },
   { title: 'Settings', icon: 'mdi-cog', to: '/settings' },
   { title: 'Admin', icon: 'mdi-shield-account', to: '/admin' },
 ]

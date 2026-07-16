@@ -14,6 +14,7 @@ export interface Coop {
   id: number
   name: string
   capacity: number
+  postcode: string
   notes: string
   created_at: string
   updated_at: string

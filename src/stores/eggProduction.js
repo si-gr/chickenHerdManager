@@ -100,5 +100,19 @@ export const useEggProductionStore = defineStore('eggProduction', {
         console.error('Error fetching forecast:', error)
       }
     },
+
+    async generateRegionalForecast(params = {}) {
+      this.loading = true
+      try {
+        const response = await apiClient.post('/forecast/regional', params)
+        this.forecast = response.data
+      } catch (error) {
+        this.error = error.message
+        console.error('Error generating regional forecast:', error)
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
   },
 })

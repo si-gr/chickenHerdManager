@@ -58,7 +58,7 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const db = getDb()
-    const { name, capacity, notes } = req.body
+    const { name, capacity, postcode, notes } = req.body
 
     if (!name) {
       return res.status(400).json({ error: 'Name is required' })
@@ -70,8 +70,8 @@ router.post('/', (req, res) => {
     }
 
     const result = db.prepare(
-      'INSERT INTO coops (user_id, name, capacity, notes) VALUES (?, ?, ?, ?)'
-    ).run(req.user.userId, name, capacity || 50, notes || '')
+      'INSERT INTO coops (user_id, name, capacity, postcode, notes) VALUES (?, ?, ?, ?, ?)'
+    ).run(req.user.userId, name, capacity || 50, postcode || '', notes || '')
 
     const coop = db.prepare('SELECT * FROM coops WHERE id = ?').get(result.lastInsertRowid)
     res.status(201).json(coop)
@@ -88,7 +88,7 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const db = getDb()
-    const { name, capacity, notes } = req.body
+    const { name, capacity, postcode, notes } = req.body
     const id = req.params.id
     
     if (!req.user) {
@@ -105,10 +105,11 @@ router.put('/:id', (req, res) => {
       UPDATE coops
       SET name = COALESCE(?, name),
           capacity = COALESCE(?, capacity),
+          postcode = COALESCE(?, postcode),
           notes = COALESCE(?, notes),
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
-    `).run(name, capacity, notes, id, req.user.userId)
+    `).run(name, capacity, postcode, notes, id, req.user.userId)
 
     const coop = db.prepare('SELECT * FROM coops WHERE id = ? AND user_id = ?').get(id, req.user.userId)
     res.json(coop)

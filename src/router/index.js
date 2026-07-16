@@ -7,6 +7,16 @@ const routes = [
     redirect: '/forecast',
   },
   {
+    path: '/coops',
+    name: 'coops',
+    component: () => import('../pages/coops.vue'),
+  },
+  {
+    path: '/regional-forecast',
+    name: 'regional-forecast',
+    component: () => import('../pages/regional-forecast.vue'),
+  },
+  {
     path: '/flocks',
     name: 'flocks',
     component: () => import('../pages/flocks.vue'),

@@ -34,6 +34,7 @@ function initializeDb() {
       user_id INTEGER NOT NULL DEFAULT 1,
       name TEXT NOT NULL UNIQUE,
       capacity INTEGER NOT NULL DEFAULT 50,
+      postcode TEXT DEFAULT '',
       notes TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -163,6 +164,15 @@ function initializeDb() {
     );
   `)
 
+  // Seed default admin user FIRST (before any FK-referencing tables)
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get()
+  if (userCount.count === 0) {
+    seedDefaultAdmin()
+  }
+  
+  // Migrate existing data to admin user if columns don't exist
+  migrateDataToUsers(db)
+
   // Seed forecasting parameters if empty
   const paramsCount = db.prepare('SELECT COUNT(*) as count FROM forecasting_params').get()
   if (paramsCount.count === 0) {
@@ -186,15 +196,6 @@ function initializeDb() {
   if (coopCount.count === 0) {
     seedData()
   }
-
-  // Seed default admin user if no users exist
-  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get()
-  if (userCount.count === 0) {
-    seedDefaultAdmin()
-  }
-  
-  // Migrate existing data to admin user if columns don't exist
-  migrateDataToUsers(db)
 }
 
 function seedBreeds() {
@@ -274,15 +275,15 @@ function seedForecastingParams() {
 }
 
 function seedData() {
-  const insertCoop = db.prepare('INSERT INTO coops (name, capacity, notes) VALUES (?, ?, ?)')
+  const insertCoop = db.prepare('INSERT INTO coops (name, capacity, postcode, notes) VALUES (?, ?, ?, ?)')
   const insertFlock = db.prepare('INSERT INTO flocks (name, breed, count, birth_date, coop_id, status, target_count, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
   const insertChicken = db.prepare('INSERT INTO chickens (name, breed, date_of_birth, status, coop_id, flock_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?)')
   const insertEgg = db.prepare('INSERT INTO egg_production (chicken_id, flock_id, coop_id, date, egg_count, notes) VALUES (?, ?, ?, ?, ?, ?)')
 
   // Create coops
-  insertCoop.run('Main Coop', 100, 'Primary coop for large flocks')
-  insertCoop.run('Barn Coop', 75, 'Secondary coop')
-  insertCoop.run('Garden Coop', 50, 'Free-range coop')
+  insertCoop.run('Main Coop', 100, '12345', 'Primary coop for large flocks')
+  insertCoop.run('Barn Coop', 75, '67890', 'Secondary coop')
+  insertCoop.run('Garden Coop', 50, '54321', 'Free-range coop')
 
   // Create flocks with different breeds and ages (large-scale model)
   const breeds = [
@@ -389,6 +390,15 @@ function migrateDataToUsers(db) {
     // Update all existing records to belong to admin user (id=1)
     for (const table of tables) {
       db.exec(`UPDATE ${table} SET user_id = 1 WHERE user_id IS NULL`)
+    }
+    
+    // Check if postcode column exists in coops table and add it if not
+    const coopColumns = db.pragma('table_info(coops)')
+    const hasPostcode = coopColumns.some(col => col.name === 'postcode')
+    
+    if (!hasPostcode) {
+      db.exec(`ALTER TABLE coops ADD COLUMN postcode TEXT DEFAULT ''`)
+      console.log('Added postcode column to coops')
     }
     
     console.log('Data migration to users completed')
