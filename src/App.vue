@@ -106,8 +106,8 @@ function handleLogout() {
   // Trigger storage event for same-page updates
   window.dispatchEvent(new Event('storage'))
   
-  // Redirect to admin login page
-  router.push('/admin')
+  // Full page reload to ensure clean state and show login screen
+  window.location.href = '/admin'
 }
 
 const navItems = [
